@@ -73,11 +73,16 @@ export default function Catalogo() {
     try {
       const datos = new FormData()
       datos.append('archivo', elegido)
+      setAviso('Importando el Excel. Con inventarios grandes puede tardar varios minutos…')
       const resultado = await api('/api/libros/importar', { method: 'POST', body: datos })
       setAviso(`Se cargaron ${resultado.cargadas} obras. Se ignoraron ${resultado.ignoradas} porque ya estaban en el catálogo.`)
       cargar()
     } catch (err) {
-      setError(err.message)
+      setError(
+        err.message.includes('despertando') || err.status === 502 || err.status === 503 || err.status === 500
+          ? 'La importación falló. El Excel completo es muy grande para el servidor gratuito: divide el archivo en partes de unas 150 filas o espera a que termine una carga por lotes.'
+          : err.message,
+      )
     } finally {
       setSubiendo(false)
     }
