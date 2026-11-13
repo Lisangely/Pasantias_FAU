@@ -226,3 +226,32 @@ export function Pagina({ titulo, texto, acciones, children }) {
     </section>
   )
 }
+
+export const FILAS_POR_PAGINA = 50
+
+export function paginaDe(lista, pagina, tamano = FILAS_POR_PAGINA) {
+  const hoja = Math.max(0, pagina)
+  const inicio = hoja * tamano
+  return lista.slice(inicio, inicio + tamano)
+}
+
+export function Paginacion({ pagina, total, tamano = FILAS_POR_PAGINA, onChange }) {
+  const hojas = Math.max(1, Math.ceil(total / tamano))
+  if (total <= tamano) return null
+  return (
+    <div className="acciones" style={{ marginTop: '1rem', justifyContent: 'space-between' }}>
+      <p className="nota">
+        Mostrando {Math.min(total, pagina * tamano + 1)}–{Math.min(total, (pagina + 1) * tamano)} de {total}
+      </p>
+      <div className="acciones">
+        <button className="boton boton-secundario" type="button" disabled={pagina <= 0} onClick={() => onChange(pagina - 1)}>
+          Anterior
+        </button>
+        <span className="nota">Página {pagina + 1} de {hojas}</span>
+        <button className="boton boton-secundario" type="button" disabled={pagina >= hojas - 1} onClick={() => onChange(pagina + 1)}>
+          Siguiente
+        </button>
+      </div>
+    </div>
+  )
+}

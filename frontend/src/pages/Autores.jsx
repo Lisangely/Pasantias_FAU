@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, AvisarVacios, Busqueda, Campo, Confirmar, Pagina, Vacio, algunoEmpieza, vacios } from '../ui'
+import { Aviso, AvisarVacios, Busqueda, Campo, Confirmar, Pagina, Paginacion, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
 
 const VACIO = { nombre: '', apellido: '', nombreCompleto: '' }
 
@@ -15,11 +15,19 @@ export default function Autores() {
   const [form, setForm] = useState(VACIO)
   const [editando, setEditando] = useState(null)
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [confirmar, setConfirmar] = useState(null)
   const [avisarVacios, setAvisarVacios] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setPagina(0) }, [consulta])
+
+  const filtrados = useMemo(
+    () => autores.filter((autor) => algunoEmpieza(consulta, [autor.nombre, autor.apellido, autor.nombreCompleto, `${autor.nombre} ${autor.apellido || ''}`])),
+    [autores, consulta],
+  )
+  const visibles = paginaDe(filtrados, pagina)
 
   async function cargar() {
     try {
@@ -102,25 +110,28 @@ export default function Autores() {
           </div>
         </form>}
         <div className="tabla-contenedor">
-          {autores.filter((autor) => algunoEmpieza(consulta, [autor.nombre, autor.apellido, autor.nombreCompleto, `${autor.nombre} ${autor.apellido || ''}`])).length === 0 ? <Vacio>No hay autores que empiecen por ese texto.</Vacio> : (
-            <table>
-              <thead>
-                <tr><th>Nombre</th><th>Apellido</th><th>Nombre completo</th><th></th></tr>
-              </thead>
-              <tbody>
-                {autores.filter((autor) => algunoEmpieza(consulta, [autor.nombre, autor.apellido, autor.nombreCompleto, `${autor.nombre} ${autor.apellido || ''}`])).map((autor) => (
-                  <tr key={autor.idAutor}>
-                    <td>{autor.nombre}</td>
-                    <td>{autor.apellido || '—'}</td>
-                    <td>{autor.nombreCompleto || '—'}</td>
-                    <td className="acciones-tabla">
-                      {editarPermiso && <button type="button" onClick={() => editar(autor)}>Editar</button>}
-                      {borrar && <button type="button" onClick={() => setConfirmar(autor.idAutor)}>Eliminar</button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {filtrados.length === 0 ? <Vacio>No hay autores que empiecen por ese texto.</Vacio> : (
+            <>
+              <table>
+                <thead>
+                  <tr><th>Nombre</th><th>Apellido</th><th>Nombre completo</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {visibles.map((autor) => (
+                    <tr key={autor.idAutor}>
+                      <td>{autor.nombre}</td>
+                      <td>{autor.apellido || '—'}</td>
+                      <td>{autor.nombreCompleto || '—'}</td>
+                      <td className="acciones-tabla">
+                        {editarPermiso && <button type="button" onClick={() => editar(autor)}>Editar</button>}
+                        {borrar && <button type="button" onClick={() => setConfirmar(autor.idAutor)}>Eliminar</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+            </>
           )}
         </div>
       </div>

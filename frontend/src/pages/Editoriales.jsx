@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, Busqueda, Campo, Confirmar, Pagina, Vacio, empiezaPor } from '../ui'
+import { Aviso, Busqueda, Campo, Confirmar, Pagina, Paginacion, Vacio, empiezaPor, paginaDe } from '../ui'
 
 export default function Editoriales() {
   const { usuario } = useAuth()
@@ -13,10 +13,18 @@ export default function Editoriales() {
   const [nombre, setNombre] = useState('')
   const [editando, setEditando] = useState(null)
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [confirmar, setConfirmar] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setPagina(0) }, [consulta])
+
+  const filtrados = useMemo(
+    () => editoriales.filter((editorial) => empiezaPor(editorial.nombre, consulta)),
+    [editoriales, consulta],
+  )
+  const visibles = paginaDe(filtrados, pagina)
 
   async function cargar() {
     try {
@@ -68,21 +76,24 @@ export default function Editoriales() {
           </div>
         </form>}
         <div className="tabla-contenedor">
-          {editoriales.filter((editorial) => empiezaPor(editorial.nombre, consulta)).length === 0 ? <Vacio>No hay editoriales que empiecen por ese texto.</Vacio> : (
-            <table>
-              <thead><tr><th>Nombre</th><th></th></tr></thead>
-              <tbody>
-                {editoriales.filter((editorial) => empiezaPor(editorial.nombre, consulta)).map((editorial) => (
-                  <tr key={editorial.idEditorial}>
-                    <td>{editorial.nombre}</td>
-                    <td className="acciones-tabla">
-                      {editarPermiso && <button type="button" onClick={() => { setEditando(editorial.idEditorial); setNombre(editorial.nombre) }}>Editar</button>}
-                      {borrar && <button type="button" onClick={() => setConfirmar(editorial.idEditorial)}>Eliminar</button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {filtrados.length === 0 ? <Vacio>No hay editoriales que empiecen por ese texto.</Vacio> : (
+            <>
+              <table>
+                <thead><tr><th>Nombre</th><th></th></tr></thead>
+                <tbody>
+                  {visibles.map((editorial) => (
+                    <tr key={editorial.idEditorial}>
+                      <td>{editorial.nombre}</td>
+                      <td className="acciones-tabla">
+                        {editarPermiso && <button type="button" onClick={() => { setEditando(editorial.idEditorial); setNombre(editorial.nombre) }}>Editar</button>}
+                        {borrar && <button type="button" onClick={() => setConfirmar(editorial.idEditorial)}>Eliminar</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+            </>
           )}
         </div>
       </div>

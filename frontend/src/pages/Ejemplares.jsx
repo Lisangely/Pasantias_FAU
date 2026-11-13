@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, AvisarVacios, Busqueda, Campo, Pagina, Selector, Vacio, algunoEmpieza, vacios } from '../ui'
+import { Aviso, AvisarVacios, Busqueda, Campo, Pagina, Paginacion, Selector, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
 
 const VACIO = { idLibro: '', idUbicacion: '', numeroEjemplar: '', disponible: true, requiereRevision: false }
 
@@ -16,11 +16,12 @@ export default function Ejemplares() {
   const [form, setForm] = useState(VACIO)
   const [editando, setEditando] = useState(null)
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [avisarVacios, setAvisarVacios] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([api('/api/libros'), api('/api/ubicaciones')])
+    Promise.all([api('/api/libros/buscar'), api('/api/ubicaciones')])
       .then(([listaLibros, listaUbicaciones]) => {
         setLibros(listaLibros)
         setUbicaciones(listaUbicaciones)
@@ -28,6 +29,14 @@ export default function Ejemplares() {
       .catch((err) => setError(err.message))
     cargar()
   }, [])
+
+  useEffect(() => { setPagina(0) }, [consulta])
+
+  const filtrados = useMemo(
+    () => ejemplares.filter((ejemplar) => algunoEmpieza(consulta, [ejemplar.libro?.titulo, ejemplar.ubicacion?.ubicacionOriginal])),
+    [ejemplares, consulta],
+  )
+  const visibles = paginaDe(filtrados, pagina)
 
   async function cargar() {
     setError('')
@@ -114,36 +123,39 @@ export default function Ejemplares() {
           </div>
         </form>}
         <div className="tabla-contenedor">
-          {ejemplares.filter((ejemplar) => algunoEmpieza(consulta, [ejemplar.libro?.titulo, ejemplar.ubicacion?.ubicacionOriginal])).length === 0 ? <Vacio>No hay ejemplares que empiecen por ese texto.</Vacio> : (
-            <table>
-              <thead>
-                <tr><th>Obra</th><th>Nº</th><th>Ubicación</th><th>Estado</th><th></th></tr>
-              </thead>
-              <tbody>
-                {ejemplares.filter((ejemplar) => algunoEmpieza(consulta, [ejemplar.libro?.titulo, ejemplar.ubicacion?.ubicacionOriginal])).map((ejemplar) => (
-                  <tr key={ejemplar.idEjemplar}>
-                    <td>{ejemplar.libro?.titulo || '—'}</td>
-                    <td>{ejemplar.numeroEjemplar ?? '—'}</td>
-                    <td>{ejemplar.ubicacion?.ubicacionOriginal || '—'}</td>
-                    <td><span className={`marca-estado ${ejemplar.disponible ? 'resuelto' : 'pendiente'}`}>{ejemplar.disponible ? 'Disponible' : 'No disponible'}</span></td>
-                    <td>
-                      {editarPermiso && (
-                        <button type="button" onClick={() => {
-                          setEditando(ejemplar.idEjemplar)
-                          setForm({
-                            idLibro: ejemplar.libro?.idLibro ?? '',
-                            idUbicacion: ejemplar.ubicacion?.idUbicacion ?? '',
-                            numeroEjemplar: ejemplar.numeroEjemplar ?? '',
-                            disponible: Boolean(ejemplar.disponible),
-                            requiereRevision: Boolean(ejemplar.requiereRevision),
-                          })
-                        }}>Editar</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {filtrados.length === 0 ? <Vacio>No hay ejemplares que empiecen por ese texto.</Vacio> : (
+            <>
+              <table>
+                <thead>
+                  <tr><th>Obra</th><th>Nº</th><th>Ubicación</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {visibles.map((ejemplar) => (
+                    <tr key={ejemplar.idEjemplar}>
+                      <td>{ejemplar.libro?.titulo || '—'}</td>
+                      <td>{ejemplar.numeroEjemplar ?? '—'}</td>
+                      <td>{ejemplar.ubicacion?.ubicacionOriginal || '—'}</td>
+                      <td><span className={`marca-estado ${ejemplar.disponible ? 'resuelto' : 'pendiente'}`}>{ejemplar.disponible ? 'Disponible' : 'No disponible'}</span></td>
+                      <td>
+                        {editarPermiso && (
+                          <button type="button" onClick={() => {
+                            setEditando(ejemplar.idEjemplar)
+                            setForm({
+                              idLibro: ejemplar.libro?.idLibro ?? '',
+                              idUbicacion: ejemplar.ubicacion?.idUbicacion ?? '',
+                              numeroEjemplar: ejemplar.numeroEjemplar ?? '',
+                              disponible: Boolean(ejemplar.disponible),
+                              requiereRevision: Boolean(ejemplar.requiereRevision),
+                            })
+                          }}>Editar</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+            </>
           )}
         </div>
       </div>

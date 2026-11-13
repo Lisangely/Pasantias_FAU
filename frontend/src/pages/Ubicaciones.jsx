@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, AvisarVacios, Busqueda, Campo, Confirmar, Pagina, Vacio, algunoEmpieza, vacios } from '../ui'
+import { Aviso, AvisarVacios, Busqueda, Campo, Confirmar, Pagina, Paginacion, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
 
 const VACIO = { ubicacionOriginal: '', estanteria: '', posicion: '', requiereRevision: false }
 
@@ -15,11 +15,19 @@ export default function Ubicaciones() {
   const [form, setForm] = useState(VACIO)
   const [editando, setEditando] = useState(null)
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [confirmar, setConfirmar] = useState(null)
   const [avisarVacios, setAvisarVacios] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setPagina(0) }, [consulta])
+
+  const filtrados = useMemo(
+    () => ubicaciones.filter((ubicacion) => algunoEmpieza(consulta, [ubicacion.ubicacionOriginal, ubicacion.estanteria, ubicacion.posicion])),
+    [ubicaciones, consulta],
+  )
+  const visibles = paginaDe(filtrados, pagina)
 
   async function cargar() {
     try {
@@ -97,26 +105,29 @@ export default function Ubicaciones() {
           </div>
         </form>}
         <div className="tabla-contenedor">
-          {ubicaciones.filter((ubicacion) => algunoEmpieza(consulta, [ubicacion.ubicacionOriginal, ubicacion.estanteria, ubicacion.posicion])).length === 0 ? <Vacio>No hay ubicaciones que empiecen por ese texto.</Vacio> : (
-            <table>
-              <thead>
-                <tr><th>Original</th><th>Estantería</th><th>Posición</th><th>Revisión</th><th></th></tr>
-              </thead>
-              <tbody>
-                {ubicaciones.filter((ubicacion) => algunoEmpieza(consulta, [ubicacion.ubicacionOriginal, ubicacion.estanteria, ubicacion.posicion])).map((ubicacion) => (
-                  <tr key={ubicacion.idUbicacion}>
-                    <td>{ubicacion.ubicacionOriginal}</td>
-                    <td>{ubicacion.estanteria || '—'}</td>
-                    <td>{ubicacion.posicion || '—'}</td>
-                    <td>{ubicacion.requiereRevision ? 'Sí' : 'No'}</td>
-                    <td className="acciones-tabla">
-                      {editarPermiso && <button type="button" onClick={() => { setEditando(ubicacion.idUbicacion); setForm({ ubicacionOriginal: ubicacion.ubicacionOriginal || '', estanteria: ubicacion.estanteria || '', posicion: ubicacion.posicion || '', requiereRevision: Boolean(ubicacion.requiereRevision) }) }}>Editar</button>}
-                      {borrar && <button type="button" onClick={() => setConfirmar(ubicacion.idUbicacion)}>Eliminar</button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {filtrados.length === 0 ? <Vacio>No hay ubicaciones que empiecen por ese texto.</Vacio> : (
+            <>
+              <table>
+                <thead>
+                  <tr><th>Original</th><th>Estantería</th><th>Posición</th><th>Revisión</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {visibles.map((ubicacion) => (
+                    <tr key={ubicacion.idUbicacion}>
+                      <td>{ubicacion.ubicacionOriginal}</td>
+                      <td>{ubicacion.estanteria || '—'}</td>
+                      <td>{ubicacion.posicion || '—'}</td>
+                      <td>{ubicacion.requiereRevision ? 'Sí' : 'No'}</td>
+                      <td className="acciones-tabla">
+                        {editarPermiso && <button type="button" onClick={() => { setEditando(ubicacion.idUbicacion); setForm({ ubicacionOriginal: ubicacion.ubicacionOriginal || '', estanteria: ubicacion.estanteria || '', posicion: ubicacion.posicion || '', requiereRevision: Boolean(ubicacion.requiereRevision) }) }}>Editar</button>}
+                        {borrar && <button type="button" onClick={() => setConfirmar(ubicacion.idUbicacion)}>Eliminar</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+            </>
           )}
         </div>
       </div>

@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom'
 import { api, descargar } from '../api'
 import { useAuth } from '../auth'
 import { esAdmin, puede } from '../permisos'
-import { Aviso, Campo, Confirmar, Pagina, Vacio, formatoFecha } from '../ui'
+import { Aviso, Campo, Confirmar, FILAS_POR_PAGINA, Pagina, Vacio, formatoFecha } from '../ui'
 
 const FILTRO_INICIAL = { titulo: '', autor: '', cota: '', tipo: '' }
-const LIMITE = 80
 
-function parametrosDe(filtro) {
-  const params = new URLSearchParams({ limite: String(LIMITE) })
+function parametrosDe(filtro, pagina) {
+  const params = new URLSearchParams({
+    limite: String(FILAS_POR_PAGINA),
+    pagina: String(pagina),
+  })
   for (const [clave, valor] of Object.entries(filtro)) {
     const texto = valor.trim()
     if (texto) params.set(clave, texto)
@@ -23,6 +25,7 @@ export default function Catalogo() {
   const admin = esAdmin(usuario)
   const [filtro, setFiltro] = useState(FILTRO_INICIAL)
   const [consulta, setConsulta] = useState(FILTRO_INICIAL)
+  const [pagina, setPagina] = useState(0)
   const [libros, setLibros] = useState([])
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
@@ -36,7 +39,10 @@ export default function Catalogo() {
   const pedido = useRef(0)
 
   useEffect(() => {
-    const espera = setTimeout(() => setConsulta(filtro), 300)
+    const espera = setTimeout(() => {
+      setPagina(0)
+      setConsulta(filtro)
+    }, 300)
     return () => clearTimeout(espera)
   }, [filtro])
 
@@ -44,7 +50,7 @@ export default function Catalogo() {
     const id = ++pedido.current
     setCargando(true)
     setError('')
-    api(`/api/libros/catalogo?${parametrosDe(consulta)}`)
+    api(`/api/libros/catalogo?${parametrosDe(consulta, pagina)}`)
       .then((lista) => {
         if (id !== pedido.current) return
         setLibros(lista)
@@ -57,7 +63,7 @@ export default function Catalogo() {
       .finally(() => {
         if (id === pedido.current) setCargando(false)
       })
-  }, [consulta])
+  }, [consulta, pagina])
 
   async function descargarExcel() {
     setError('')
@@ -85,6 +91,7 @@ export default function Catalogo() {
       setAviso('Importando el Excel. Con inventarios grandes puede tardar varios minutos…')
       const resultado = await api('/api/libros/importar', { method: 'POST', body: datos })
       setAviso(`Se cargaron ${resultado.cargadas} obras. Se ignoraron ${resultado.ignoradas} porque ya estaban en el catálogo.`)
+      setPagina(0)
       setConsulta({ ...filtro })
     } catch (err) {
       setError(
@@ -118,6 +125,7 @@ export default function Catalogo() {
       setHistorial(null)
       setVersionElegida(null)
       setConfirmarVersion(false)
+      setPagina(0)
       setConsulta({ ...filtro })
     } catch (err) {
       setHistorial((actual) => ({ ...actual, error: err.message }))
@@ -130,10 +138,12 @@ export default function Catalogo() {
     setFiltro((actual) => ({ ...actual, [name]: value }))
   }
 
+  const hayMas = libros.length >= FILAS_POR_PAGINA
+
   return (
     <Pagina
       titulo="Catálogo"
-      texto="Escribe y la lista se reduce a lo que empieza por ese texto: título, autor, cota o tipo. Se muestran hasta 80 obras por búsqueda."
+      texto="Escribe y la lista se reduce a lo que empieza por ese texto: título, autor, cota o tipo. Se muestran 50 obras por página."
       acciones={(
         <>
           <button className="boton boton-secundario" type="button" onClick={descargarExcel} disabled={descargando}>
@@ -208,6 +218,21 @@ export default function Catalogo() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {!cargando && (pagina > 0 || hayMas) && (
+        <div className="acciones" style={{ marginTop: '1rem', justifyContent: 'space-between' }}>
+          <p className="nota">
+            Página {pagina + 1}: {libros.length} obra{libros.length === 1 ? '' : 's'}
+          </p>
+          <div className="acciones">
+            <button className="boton boton-secundario" type="button" disabled={pagina <= 0 || cargando} onClick={() => setPagina((actual) => actual - 1)}>
+              Anterior
+            </button>
+            <button className="boton boton-secundario" type="button" disabled={!hayMas || cargando} onClick={() => setPagina((actual) => actual + 1)}>
+              Siguiente
+            </button>
+          </div>
         </div>
       )}
       {historial && (

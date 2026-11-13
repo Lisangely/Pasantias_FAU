@@ -52,9 +52,10 @@ public class LibroController {
             @RequestParam(required = false) String autor,
             @RequestParam(required = false) String cota,
             @RequestParam(required = false) String tipo,
-            @RequestParam(required = false) Integer limite) {
+            @RequestParam(required = false) Integer limite,
+            @RequestParam(required = false) Integer pagina) {
 
-        return libroService.catalogo(titulo, autor, cota, tipo, limite);
+        return libroService.catalogo(titulo, autor, cota, tipo, limite, pagina);
     }
 
     @GetMapping("/buscar")

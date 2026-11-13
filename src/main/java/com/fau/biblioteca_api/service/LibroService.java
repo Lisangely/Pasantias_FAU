@@ -64,7 +64,7 @@ public class LibroService {
             String cota,
             String tipo) {
 
-        return buscarLimitado(titulo, autor, cota, tipo, 500);
+        return buscarLimitado(titulo, autor, cota, tipo, 500, 0);
     }
 
     @Transactional(readOnly = true)
@@ -73,10 +73,12 @@ public class LibroService {
             String autor,
             String cota,
             String tipo,
-            Integer limite) {
+            Integer limite,
+            Integer pagina) {
 
-        int tope = limite == null ? 80 : Math.max(1, Math.min(limite, 200));
-        List<Libro> libros = buscarLimitado(titulo, autor, cota, tipo, tope);
+        int tope = limite == null ? 50 : Math.max(1, Math.min(limite, 200));
+        int hoja = pagina == null ? 0 : Math.max(0, pagina);
+        List<Libro> libros = buscarLimitado(titulo, autor, cota, tipo, tope, hoja);
 
         if (libros.isEmpty()) {
             return List.of();
@@ -472,20 +474,21 @@ public class LibroService {
             String autor,
             String cota,
             String tipo,
-            int limite) {
+            int limite,
+            int pagina) {
 
         String tituloBusqueda = enBlanco(titulo);
         String autorBusqueda = enBlanco(autor);
         String cotaBusqueda = enBlanco(cota);
         String tipoBusqueda = enBlanco(tipo);
-        var pagina = PageRequest.of(0, limite);
+        var hoja = PageRequest.of(pagina, limite);
 
         if (autorBusqueda == null) {
             return libroRepository.buscarSinAutor(
-                    tituloBusqueda, cotaBusqueda, tipoBusqueda, pagina);
+                    tituloBusqueda, cotaBusqueda, tipoBusqueda, hoja);
         }
         return libroRepository.buscarConAutor(
-                tituloBusqueda, autorBusqueda, cotaBusqueda, tipoBusqueda, pagina);
+                tituloBusqueda, autorBusqueda, cotaBusqueda, tipoBusqueda, hoja);
     }
 
     private String enBlanco(String valor) {

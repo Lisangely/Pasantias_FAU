@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, AvisarVacios, Busqueda, Campo, Pagina, Selector, Vacio, algunoEmpieza, vacios } from '../ui'
+import { Aviso, AvisarVacios, Busqueda, Campo, Pagina, Paginacion, Selector, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
 
 const VACIO = { idLibro: '', campo: '', valorOriginal: '', descripcion: '' }
 
@@ -15,6 +15,7 @@ export default function Incidencias() {
   const [filtro, setFiltro] = useState('')
   const [form, setForm] = useState(VACIO)
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [abierta, setAbierta] = useState(null)
   const [valor, setValor] = useState('')
   const [detalle, setDetalle] = useState({ autores: [], ejemplares: [] })
@@ -23,9 +24,17 @@ export default function Incidencias() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    api('/api/libros').then(setLibros).catch((err) => setError(err.message))
+    api('/api/libros/buscar').then(setLibros).catch((err) => setError(err.message))
     cargar('')
   }, [])
+
+  useEffect(() => { setPagina(0) }, [consulta, filtro])
+
+  const filtrados = useMemo(
+    () => incidencias.filter((incidencia) => algunoEmpieza(consulta, [incidencia.libro?.titulo, incidencia.campo, incidencia.descripcion, incidencia.valorOriginal])),
+    [incidencias, consulta],
+  )
+  const visibles = paginaDe(filtrados, pagina)
 
   async function cargar(estado) {
     setError('')
@@ -132,12 +141,12 @@ export default function Incidencias() {
         <button className="boton" type="submit">Registrar</button>
       </form>}
       <Busqueda valor={consulta} onChange={setConsulta} placeholder="Obra, campo o descripción" />
-      {incidencias.filter((incidencia) => algunoEmpieza(consulta, [incidencia.libro?.titulo, incidencia.campo, incidencia.descripcion, incidencia.valorOriginal])).length === 0 ? <Vacio>No hay incidencias que empiecen por ese texto.</Vacio> : (
+      {filtrados.length === 0 ? <Vacio>No hay incidencias que empiecen por ese texto.</Vacio> : (
         <div className="tabla-contenedor">
           <table>
             <thead><tr><th>Obra</th><th>Campo</th><th>Valor original</th><th>Descripción</th><th>Estado</th><th></th></tr></thead>
             <tbody>
-              {incidencias.filter((incidencia) => algunoEmpieza(consulta, [incidencia.libro?.titulo, incidencia.campo, incidencia.descripcion, incidencia.valorOriginal])).map((incidencia) => (
+              {visibles.map((incidencia) => (
                 <tr key={incidencia.idIncidencia}>
                   <td>{incidencia.libro?.titulo || '—'}</td>
                   <td>{incidencia.campo}</td>
@@ -149,6 +158,7 @@ export default function Incidencias() {
               ))}
             </tbody>
           </table>
+          <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
         </div>
       )}
       {avisarVacios && (

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, Busqueda, Campo, Pagina, Selector, Vacio, algunoEmpieza, formatoFecha } from '../ui'
+import { Aviso, Busqueda, Campo, Pagina, Paginacion, Selector, Vacio, algunoEmpieza, formatoFecha, paginaDe } from '../ui'
 
 const LECTOR_VACIO = { nombre: '', apellido: '', cedula: '', correo: '', telefono: '', semestre: '', carrera: '' }
 
@@ -16,6 +16,7 @@ export default function Prestamos() {
   const [lectores, setLectores] = useState([])
   const [form, setForm] = useState({ idEjemplar: '', idLector: '', fechaDevolucionEsperada: '' })
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [popup, setPopup] = useState(false)
   const [nuevoLector, setNuevoLector] = useState(LECTOR_VACIO)
   const [error, setError] = useState('')
@@ -23,6 +24,7 @@ export default function Prestamos() {
   const [aviso, setAviso] = useState('')
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setPagina(0) }, [consulta])
 
   async function cargar() {
     setError('')
@@ -102,7 +104,7 @@ export default function Prestamos() {
   }
 
   const disponibles = ejemplares.filter((ejemplar) => ejemplar.disponible)
-  const ordenados = [...prestamos]
+  const ordenados = useMemo(() => [...prestamos]
     .sort((a, b) => String(b.fechaPrestamo).localeCompare(String(a.fechaPrestamo)))
     .filter((prestamo) => algunoEmpieza(consulta, [
       prestamo.ejemplar?.libro?.titulo,
@@ -110,7 +112,8 @@ export default function Prestamos() {
       prestamo.lector?.nombre,
       prestamo.lector?.apellido,
       prestamo.estado,
-    ]))
+    ])), [prestamos, consulta])
+  const visibles = paginaDe(ordenados, pagina)
 
   return (
     <Pagina titulo="Préstamos" texto="El préstamo queda a nombre de quien inició sesión. Un ejemplar no puede tener dos préstamos activos.">
@@ -186,7 +189,7 @@ export default function Prestamos() {
               <tr><th>Obra</th><th>Lector</th><th>Prestado</th><th>Estimada</th><th>Devuelto</th><th>Registró</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody>
-              {ordenados.map((prestamo) => (
+              {visibles.map((prestamo) => (
                 <tr key={prestamo.idPrestamo}>
                   <td>{prestamo.ejemplar?.libro?.titulo || '—'} · Nº {prestamo.ejemplar?.numeroEjemplar ?? prestamo.ejemplar?.idEjemplar}</td>
                   <td>{prestamo.lector ? `${prestamo.lector.nombre} ${prestamo.lector.apellido}` : '—'}</td>
@@ -204,6 +207,7 @@ export default function Prestamos() {
               ))}
             </tbody>
           </table>
+          <Paginacion pagina={pagina} total={ordenados.length} onChange={setPagina} />
         </div>
       )}
     </Pagina>

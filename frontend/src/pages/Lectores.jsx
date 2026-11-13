@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, Busqueda, Campo, Confirmar, Pagina, Vacio, algunoEmpieza } from '../ui'
+import { Aviso, Busqueda, Campo, Confirmar, Pagina, Paginacion, Vacio, algunoEmpieza, paginaDe } from '../ui'
 
 const VACIO = { nombre: '', apellido: '', cedula: '', correo: '', telefono: '', semestre: '', carrera: '' }
 
@@ -15,10 +15,18 @@ export default function Lectores() {
   const [form, setForm] = useState(VACIO)
   const [editando, setEditando] = useState(null)
   const [consulta, setConsulta] = useState('')
+  const [pagina, setPagina] = useState(0)
   const [confirmar, setConfirmar] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => { cargar() }, [])
+  useEffect(() => { setPagina(0) }, [consulta])
+
+  const filtrados = useMemo(
+    () => lectores.filter((lector) => algunoEmpieza(consulta, [lector.nombre, lector.apellido, `${lector.nombre} ${lector.apellido}`, lector.cedula])),
+    [lectores, consulta],
+  )
+  const visibles = paginaDe(filtrados, pagina)
 
   async function cargar() {
     try {
@@ -82,26 +90,29 @@ export default function Lectores() {
           </div>
         </form>}
         <div className="tabla-contenedor">
-          {lectores.filter((lector) => algunoEmpieza(consulta, [lector.nombre, lector.apellido, `${lector.nombre} ${lector.apellido}`, lector.cedula])).length === 0 ? <Vacio>No hay lectores que empiecen por ese texto.</Vacio> : (
-            <table>
-              <thead><tr><th>Nombre</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Semestre</th><th>Carrera</th><th></th></tr></thead>
-              <tbody>
-                {lectores.filter((lector) => algunoEmpieza(consulta, [lector.nombre, lector.apellido, `${lector.nombre} ${lector.apellido}`, lector.cedula])).map((lector) => (
-                  <tr key={lector.idLector}>
-                    <td>{lector.nombre} {lector.apellido}</td>
-                    <td>{lector.cedula || '—'}</td>
-                    <td>{lector.correo || '—'}</td>
-                    <td>{lector.telefono || '—'}</td>
-                    <td>{lector.semestre || '—'}</td>
-                    <td>{lector.carrera || '—'}</td>
-                    <td className="acciones-tabla">
-                      {editarPermiso && <button type="button" onClick={() => { setEditando(lector.idLector); setForm({ nombre: lector.nombre || '', apellido: lector.apellido || '', cedula: lector.cedula || '', correo: lector.correo || '', telefono: lector.telefono || '', semestre: lector.semestre || '', carrera: lector.carrera || '' }) }}>Editar</button>}
-                      {borrar && <button type="button" onClick={() => setConfirmar(lector.idLector)}>Eliminar</button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {filtrados.length === 0 ? <Vacio>No hay lectores que empiecen por ese texto.</Vacio> : (
+            <>
+              <table>
+                <thead><tr><th>Nombre</th><th>Cédula</th><th>Correo</th><th>Teléfono</th><th>Semestre</th><th>Carrera</th><th></th></tr></thead>
+                <tbody>
+                  {visibles.map((lector) => (
+                    <tr key={lector.idLector}>
+                      <td>{lector.nombre} {lector.apellido}</td>
+                      <td>{lector.cedula || '—'}</td>
+                      <td>{lector.correo || '—'}</td>
+                      <td>{lector.telefono || '—'}</td>
+                      <td>{lector.semestre || '—'}</td>
+                      <td>{lector.carrera || '—'}</td>
+                      <td className="acciones-tabla">
+                        {editarPermiso && <button type="button" onClick={() => { setEditando(lector.idLector); setForm({ nombre: lector.nombre || '', apellido: lector.apellido || '', cedula: lector.cedula || '', correo: lector.correo || '', telefono: lector.telefono || '', semestre: lector.semestre || '', carrera: lector.carrera || '' }) }}>Editar</button>}
+                        {borrar && <button type="button" onClick={() => setConfirmar(lector.idLector)}>Eliminar</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+            </>
           )}
         </div>
       </div>
