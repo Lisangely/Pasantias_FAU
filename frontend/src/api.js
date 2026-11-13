@@ -32,7 +32,11 @@ export async function api(path, options = {}) {
       headers,
     })
   } catch {
-    throw new Error('No se pudo conectar con la API. Comprueba que el servidor esté en el puerto 8081.')
+    throw new Error(
+      API
+        ? `No se pudo conectar con la API en ${API}. Si acabas de despertar el servidor, espera un minuto y vuelve a intentar.`
+        : 'No se pudo conectar con la API. Comprueba que el servidor esté en marcha.',
+    )
   }
 
   const text = await response.text()
@@ -51,7 +55,7 @@ export async function api(path, options = {}) {
 
   if (!response.ok) {
     const mensaje = response.status === 502 || response.status === 503
-      ? 'La API no está en marcha. Inicia el servidor de la biblioteca en el puerto 8081.'
+      ? 'La API no está en marcha o sigue despertando. Espera un minuto y vuelve a intentar.'
       : mensajeDe(data, response.status)
     const error = new Error(mensaje)
     error.status = response.status
@@ -66,7 +70,11 @@ export async function descargar(path, nombre) {
   try {
     response = await fetch(`${API}${path}`, { credentials: 'include' })
   } catch {
-    throw new Error('No se pudo conectar con la API. Comprueba que el servidor esté en el puerto 8081.')
+    throw new Error(
+      API
+        ? `No se pudo conectar con la API en ${API}. Si acabas de despertar el servidor, espera un minuto y vuelve a intentar.`
+        : 'No se pudo conectar con la API. Comprueba que el servidor esté en marcha.',
+    )
   }
 
   if (!response.ok) {
@@ -81,7 +89,7 @@ export async function descargar(path, nombre) {
     }
     if (response.status === 401) alPerderSesion()
     const mensaje = response.status === 502 || response.status === 503
-      ? 'La API no está en marcha. Inicia el servidor de la biblioteca en el puerto 8081.'
+      ? 'La API no está en marcha o sigue despertando. Espera un minuto y vuelve a intentar.'
       : mensajeDe(data, response.status)
     throw new Error(mensaje)
   }
