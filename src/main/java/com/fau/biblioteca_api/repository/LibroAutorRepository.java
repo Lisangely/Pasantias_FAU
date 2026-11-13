@@ -5,7 +5,9 @@ import com.fau.biblioteca_api.entity.LibroAutor;
 import com.fau.biblioteca_api.entity.LibroAutorId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface LibroAutorRepository
@@ -19,4 +21,12 @@ public interface LibroAutorRepository
             FROM LibroAutor la JOIN la.autor a
             """)
     List<AutorLibroResumen> resumen();
+
+    @Query("""
+            SELECT new com.fau.biblioteca_api.dto.AutorLibroResumen(
+                la.libro.idLibro, a.nombre, a.apellido, a.nombreCompleto)
+            FROM LibroAutor la JOIN la.autor a
+            WHERE la.libro.idLibro IN :ids
+            """)
+    List<AutorLibroResumen> resumenDe(@Param("ids") Collection<Integer> ids);
 }

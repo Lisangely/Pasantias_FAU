@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, descargar } from '../api'
 import { useAuth } from '../auth'
 import { esAdmin, puede } from '../permisos'
-import { Aviso, Campo, Confirmar, Pagina, Vacio, algunoEmpieza, empiezaPor, formatoFecha } from '../ui'
+import { Aviso, Campo, Confirmar, Pagina, Vacio, formatoFecha } from '../ui'
 
 const FILTRO_INICIAL = { titulo: '', autor: '', cota: '', tipo: '' }
+const LIMITE = 80
 
-function textoAutores(lista) {
-  if (!lista?.length) return '—'
-  return lista
-    .map((autor) => autor.nombreCompleto || `${autor.nombre || ''} ${autor.apellido || ''}`.trim())
-    .filter(Boolean)
-    .join('; ')
+function parametrosDe(filtro) {
+  const params = new URLSearchParams({ limite: String(LIMITE) })
+  for (const [clave, valor] of Object.entries(filtro)) {
+    const texto = valor.trim()
+    if (texto) params.set(clave, texto)
+  }
+  return params.toString()
 }
 
 export default function Catalogo() {
@@ -20,8 +22,8 @@ export default function Catalogo() {
   const crear = puede(usuario, 'puedeCrearLibros')
   const admin = esAdmin(usuario)
   const [filtro, setFiltro] = useState(FILTRO_INICIAL)
+  const [consulta, setConsulta] = useState(FILTRO_INICIAL)
   const [libros, setLibros] = useState([])
-  const [autores, setAutores] = useState({})
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [cargando, setCargando] = useState(true)
@@ -31,24 +33,31 @@ export default function Catalogo() {
   const [versionElegida, setVersionElegida] = useState(null)
   const [confirmarVersion, setConfirmarVersion] = useState(false)
   const archivo = useRef(null)
+  const pedido = useRef(0)
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => {
+    const espera = setTimeout(() => setConsulta(filtro), 300)
+    return () => clearTimeout(espera)
+  }, [filtro])
 
-  function cargar() {
+  useEffect(() => {
+    const id = ++pedido.current
     setCargando(true)
-    Promise.all([api('/api/libros'), api('/api/libro-autor/resumen')])
-      .then(([lista, resumen]) => {
-        const mapa = {}
-        resumen.forEach((autor) => {
-          if (!mapa[autor.idLibro]) mapa[autor.idLibro] = []
-          mapa[autor.idLibro].push(autor)
-        })
+    setError('')
+    api(`/api/libros/catalogo?${parametrosDe(consulta)}`)
+      .then((lista) => {
+        if (id !== pedido.current) return
         setLibros(lista)
-        setAutores(mapa)
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setCargando(false))
-  }
+      .catch((err) => {
+        if (id !== pedido.current) return
+        setError(err.message)
+        setLibros([])
+      })
+      .finally(() => {
+        if (id === pedido.current) setCargando(false)
+      })
+  }, [consulta])
 
   async function descargarExcel() {
     setError('')
@@ -76,11 +85,11 @@ export default function Catalogo() {
       setAviso('Importando el Excel. Con inventarios grandes puede tardar varios minutos…')
       const resultado = await api('/api/libros/importar', { method: 'POST', body: datos })
       setAviso(`Se cargaron ${resultado.cargadas} obras. Se ignoraron ${resultado.ignoradas} porque ya estaban en el catálogo.`)
-      cargar()
+      setConsulta({ ...filtro })
     } catch (err) {
       setError(
         err.message.includes('despertando') || err.status === 502 || err.status === 503 || err.status === 500
-          ? 'La importación falló. El Excel completo es muy grande para el servidor gratuito: divide el archivo en partes de unas 150 filas o espera a que termine una carga por lotes.'
+          ? 'La importación falló. El Excel completo es muy grande para el servidor gratuito: divide el archivo en partes de unas 40 filas.'
           : err.message,
       )
     } finally {
@@ -109,7 +118,7 @@ export default function Catalogo() {
       setHistorial(null)
       setVersionElegida(null)
       setConfirmarVersion(false)
-      cargar()
+      setConsulta({ ...filtro })
     } catch (err) {
       setHistorial((actual) => ({ ...actual, error: err.message }))
       setConfirmarVersion(false)
@@ -121,23 +130,10 @@ export default function Catalogo() {
     setFiltro((actual) => ({ ...actual, [name]: value }))
   }
 
-  const visibles = useMemo(() => libros.filter((libro) => {
-    const delLibro = autores[libro.idLibro] || []
-    return empiezaPor(libro.titulo, filtro.titulo)
-      && empiezaPor(libro.tipo, filtro.tipo)
-      && empiezaPor(libro.cota, filtro.cota)
-      && algunoEmpieza(filtro.autor, delLibro.flatMap((autor) => [
-        autor.nombreCompleto,
-        autor.nombre,
-        autor.apellido,
-        `${autor.nombre || ''} ${autor.apellido || ''}`,
-      ]))
-  }), [libros, autores, filtro])
-
   return (
     <Pagina
       titulo="Catálogo"
-      texto="Escribe y la lista se reduce a lo que empieza por ese texto: título, autor, cota o tipo."
+      texto="Escribe y la lista se reduce a lo que empieza por ese texto: título, autor, cota o tipo. Se muestran hasta 80 obras por búsqueda."
       acciones={(
         <>
           <button className="boton boton-secundario" type="button" onClick={descargarExcel} disabled={descargando}>
@@ -171,7 +167,7 @@ export default function Catalogo() {
       </form>
       <Aviso>{error}</Aviso>
       <Aviso tipo="ok">{aviso}</Aviso>
-      {cargando ? <p className="nota">Cargando catálogo…</p> : visibles.length === 0 ? (
+      {cargando ? <p className="nota">Cargando catálogo…</p> : libros.length === 0 ? (
         <Vacio>No hay obras que empiecen por ese texto.</Vacio>
       ) : (
         <div className="tabla-contenedor">
@@ -188,17 +184,17 @@ export default function Catalogo() {
               </tr>
             </thead>
             <tbody>
-              {visibles.map((libro) => (
+              {libros.map((libro) => (
                 <tr key={libro.idLibro}>
                   <td>
                     <Link to={`/libros/${libro.idLibro}`}>{libro.titulo}</Link>
                     {libro.requiereRevisionFecha && <span className="marca-estado pendiente">Fecha por revisar</span>}
                   </td>
-                  <td>{textoAutores(autores[libro.idLibro])}</td>
+                  <td>{libro.autores || '—'}</td>
                   <td>{libro.tipo || '—'}</td>
                   <td>{libro.fechaPublicacion || libro.fechaOriginal || '—'}</td>
                   <td>{libro.cota || '—'}</td>
-                  <td>{libro.editorial?.nombre || '—'}</td>
+                  <td>{libro.editorial || '—'}</td>
                   <td className="acciones-tabla">
                     <button type="button" className="icono" title="Historial" aria-label="Historial de cambios" onClick={() => abrirHistorial(libro)}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -235,52 +231,45 @@ export default function Catalogo() {
                     {historial.eventos.map((evento) => (
                       <tr
                         key={evento.idAuditoria}
-                        className={admin ? `elegible${versionElegida === evento.idAuditoria ? ' seleccionada' : ''}` : undefined}
-                        onClick={admin ? () => setVersionElegida(evento.idAuditoria) : undefined}
+                        className={admin && String(versionElegida) === String(evento.idAuditoria) ? 'fila-elegida' : undefined}
+                        onClick={() => admin && setVersionElegida(evento.idAuditoria)}
+                        style={admin ? { cursor: 'pointer' } : undefined}
                       >
                         <td>{formatoFecha(evento.fechaEvento)}</td>
-                        <td>{evento.usuario?.usuario || '—'}</td>
-                        <td>{evento.observaciones || etiquetaAccion(evento.accion)}</td>
-                        <td>{evento.valorAnterior || '—'}</td>
-                        <td>{evento.valorNuevo || '—'}</td>
+                        <td>{evento.usuario ? `${evento.usuario.nombre || ''} ${evento.usuario.apellido || ''}`.trim() || evento.usuario.usuario : '—'}</td>
+                        <td>{evento.accion}</td>
+                        <td><pre className="mini">{evento.valorAnterior || '—'}</pre></td>
+                        <td><pre className="mini">{evento.valorNuevo || '—'}</pre></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            <div className="acciones">
-              {admin && historial.eventos?.length > 0 && (
-                <button className="boton" type="button" disabled={!versionElegida} onClick={() => setConfirmarVersion(true)}>
-                  Devolver a esta versión
+            <div className="acciones-form">
+              {admin && (
+                <button
+                  type="button"
+                  className="boton"
+                  disabled={!versionElegida}
+                  onClick={() => setConfirmarVersion(true)}
+                >
+                  Restaurar versión
                 </button>
               )}
-              <button className="boton boton-secundario" type="button" onClick={() => setHistorial(null)}>Cerrar</button>
+              <button type="button" className="boton boton-secundario" onClick={() => setHistorial(null)}>Cerrar</button>
             </div>
-            {confirmarVersion && (
-              <Confirmar
-                titulo="¿Seguro que vas a devolver la obra a esta versión?"
-                texto="Se recuperan el título, los datos bibliográficos y los autores de ese momento. Los ejemplares y los préstamos se quedan como están."
-                accion="Devolver"
-                peligro={false}
-                onCancelar={() => setConfirmarVersion(false)}
-                onConfirmar={restaurarVersion}
-              />
-            )}
           </div>
         </div>
       )}
+      {confirmarVersion && (
+        <Confirmar
+          titulo="¿Restaurar esta versión?"
+          texto="La obra volverá al estado de la fila seleccionada."
+          onCancelar={() => setConfirmarVersion(false)}
+          onConfirmar={restaurarVersion}
+        />
+      )}
     </Pagina>
   )
-}
-
-function etiquetaAccion(accion) {
-  return {
-    INSERT: 'Alta',
-    UPDATE: 'Cambio',
-    DELETE: 'Eliminación',
-    RESOLVER_INCIDENCIA: 'Resolución',
-    PRESTAMO: 'Préstamo',
-    DEVOLUCION: 'Devolución',
-  }[accion] || accion || '—'
 }

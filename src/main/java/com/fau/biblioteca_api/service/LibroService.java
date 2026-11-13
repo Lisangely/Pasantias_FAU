@@ -1,5 +1,7 @@
 package com.fau.biblioteca_api.service;
 
+import com.fau.biblioteca_api.dto.AutorLibroResumen;
+import com.fau.biblioteca_api.dto.CatalogoLibroRespuesta;
 import com.fau.biblioteca_api.dto.LibroRequest;
 import com.fau.biblioteca_api.entity.*;
 import com.fau.biblioteca_api.repository.AuditoriaRepository;
@@ -7,6 +9,7 @@ import com.fau.biblioteca_api.repository.AutorRepository;
 import com.fau.biblioteca_api.repository.EditorialRepository;
 import com.fau.biblioteca_api.repository.LibroAutorRepository;
 import com.fau.biblioteca_api.repository.LibroRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,8 +17,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class LibroService {
@@ -59,11 +64,55 @@ public class LibroService {
             String cota,
             String tipo) {
 
-        return libroRepository.buscar(
-                enBlanco(titulo),
-                enBlanco(autor),
-                enBlanco(cota),
-                enBlanco(tipo));
+        return buscarLimitado(titulo, autor, cota, tipo, 500);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogoLibroRespuesta> catalogo(
+            String titulo,
+            String autor,
+            String cota,
+            String tipo,
+            Integer limite) {
+
+        int tope = limite == null ? 80 : Math.max(1, Math.min(limite, 200));
+        List<Libro> libros = buscarLimitado(titulo, autor, cota, tipo, tope);
+
+        if (libros.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, List<String>> autoresPorLibro = new LinkedHashMap<>();
+        for (AutorLibroResumen resumen : libroAutorRepository.resumenDe(
+                libros.stream().map(Libro::getIdLibro).toList())) {
+            String nombre = resumen.getNombreCompleto();
+            if (nombre == null || nombre.isBlank()) {
+                nombre = ((resumen.getNombre() == null ? "" : resumen.getNombre()) + " "
+                        + (resumen.getApellido() == null ? "" : resumen.getApellido())).trim();
+            }
+            if (nombre.isBlank()) {
+                continue;
+            }
+            autoresPorLibro
+                    .computeIfAbsent(resumen.getIdLibro(), clave -> new ArrayList<>())
+                    .add(nombre);
+        }
+
+        List<CatalogoLibroRespuesta> respuesta = new ArrayList<>(libros.size());
+        for (Libro libro : libros) {
+            List<String> nombres = autoresPorLibro.getOrDefault(libro.getIdLibro(), List.of());
+            respuesta.add(new CatalogoLibroRespuesta(
+                    libro.getIdLibro(),
+                    libro.getTitulo(),
+                    libro.getTipo(),
+                    libro.getFechaPublicacion(),
+                    libro.getFechaOriginal(),
+                    libro.getRequiereRevisionFecha(),
+                    libro.getCota(),
+                    libro.getEditorial() == null ? null : libro.getEditorial().getNombre(),
+                    nombres.isEmpty() ? "—" : String.join("; ", nombres)));
+        }
+        return respuesta;
     }
 
     public Libro obtener(Integer id) {
@@ -416,6 +465,27 @@ public class LibroService {
 
     private UsuarioSistema obtenerUsuarioAuditoria() {
         return usuarioActualService.obtener();
+    }
+
+    private List<Libro> buscarLimitado(
+            String titulo,
+            String autor,
+            String cota,
+            String tipo,
+            int limite) {
+
+        String tituloBusqueda = enBlanco(titulo);
+        String autorBusqueda = enBlanco(autor);
+        String cotaBusqueda = enBlanco(cota);
+        String tipoBusqueda = enBlanco(tipo);
+        var pagina = PageRequest.of(0, limite);
+
+        if (autorBusqueda == null) {
+            return libroRepository.buscarSinAutor(
+                    tituloBusqueda, cotaBusqueda, tipoBusqueda, pagina);
+        }
+        return libroRepository.buscarConAutor(
+                tituloBusqueda, autorBusqueda, cotaBusqueda, tipoBusqueda, pagina);
     }
 
     private String enBlanco(String valor) {

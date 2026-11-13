@@ -1,5 +1,6 @@
 package com.fau.biblioteca_api.controller;
 
+import com.fau.biblioteca_api.dto.CatalogoLibroRespuesta;
 import com.fau.biblioteca_api.dto.ImportacionResultado;
 import com.fau.biblioteca_api.dto.LibroRequest;
 import com.fau.biblioteca_api.entity.Libro;
@@ -43,6 +44,17 @@ public class LibroController {
     @GetMapping
     public List<Libro> listar() {
         return libroService.listar();
+    }
+
+    @GetMapping("/catalogo")
+    public List<CatalogoLibroRespuesta> catalogo(
+            @RequestParam(required = false) String titulo,
+            @RequestParam(required = false) String autor,
+            @RequestParam(required = false) String cota,
+            @RequestParam(required = false) String tipo,
+            @RequestParam(required = false) Integer limite) {
+
+        return libroService.catalogo(titulo, autor, cota, tipo, limite);
     }
 
     @GetMapping("/buscar")
