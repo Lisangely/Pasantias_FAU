@@ -34,8 +34,19 @@ function Inicio() {
 }
 
 function Rutas() {
-  const { listo } = useAuth()
-  if (!listo) return <p className="cargando">Abriendo la biblioteca…</p>
+  const { listo, arrancando } = useAuth()
+  if (!listo) {
+    return (
+      <div className="cargando">
+        <p>{arrancando ? 'Despertando el servidor…' : 'Abriendo la biblioteca…'}</p>
+        {arrancando && (
+          <p className="nota">
+            En el plan gratuito la API se apaga tras un rato sin uso. La primera apertura puede tardar cerca de un minuto.
+          </p>
+        )}
+      </div>
+    )
+  }
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

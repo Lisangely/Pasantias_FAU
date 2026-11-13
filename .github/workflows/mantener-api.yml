@@ -1,0 +1,19 @@
+# Evita que Render apague la API tras 15 minutos sin visitas.
+# Consume horas del plan Free; si se acaban, la API se suspende hasta el mes siguiente.
+name: Mantener API despierta
+
+on:
+  schedule:
+    - cron: "*/12 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Despertar Render
+        run: |
+          curl -sS -o /dev/null -w "%{http_code}\n" \
+            --max-time 90 \
+            "https://pasantias-fau.onrender.com/api/auth/me" \
+            || true
