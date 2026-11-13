@@ -1,0 +1,34 @@
+# Configuración pública. La clave de Postgres va en variables de entorno,
+# nunca en este archivo. En local, application.properties (no se sube a git)
+# sigue apuntando a tu Postgres de la máquina.
+spring:
+  application:
+    name: biblioteca-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/biblioteca_fau}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+server:
+  port: ${PORT:8081}
+  forward-headers-strategy: framework
+  error:
+    include-message: always
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+    session:
+      cookie:
+        http-only: true
+        same-site: ${SESSION_SAME_SITE:lax}
+        secure: ${SESSION_COOKIE_SECURE:false}
+
+app:
+  cors:
+    origins: ${APP_CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}
