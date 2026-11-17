@@ -112,7 +112,7 @@ public class LibroService {
                     libro.getRequiereRevisionFecha(),
                     libro.getCota(),
                     libro.getEditorial() == null ? null : libro.getEditorial().getNombre(),
-                    nombres.isEmpty() ? "—" : String.join("; ", nombres)));
+                    nombres.isEmpty() ? "-" : String.join("; ", nombres)));
         }
         return respuesta;
     }

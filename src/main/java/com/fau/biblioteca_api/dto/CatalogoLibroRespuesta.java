@@ -1,3 +1,5 @@
+package com.fau.biblioteca_api.dto;
+
 public class CatalogoLibroRespuesta {
 
     private Integer idLibro;
