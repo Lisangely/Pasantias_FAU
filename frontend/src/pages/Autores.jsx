@@ -4,7 +4,7 @@ import { useAuth } from '../auth'
 import { puede } from '../permisos'
 import { Aviso, AvisarVacios, Busqueda, Campo, Confirmar, Pagina, Paginacion, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
 
-const VACIO = { nombre: '', apellido: '', nombreCompleto: '' }
+const VACIO = { nombre: '', apellido: '' }
 
 export default function Autores() {
   const { usuario } = useAuth()
@@ -47,7 +47,6 @@ export default function Autores() {
     setForm({
       nombre: autor.nombre || '',
       apellido: autor.apellido || '',
-      nombreCompleto: autor.nombreCompleto || '',
     })
   }
 
@@ -55,7 +54,6 @@ export default function Autores() {
     if (evento) evento.preventDefault()
     const faltan = vacios([
       ['Apellido', form.apellido],
-      ['Nombre completo', form.nombreCompleto],
     ])
     if (!forzar && faltan.length) {
       setAvisarVacios(faltan)
@@ -63,11 +61,16 @@ export default function Autores() {
     }
     setAvisarVacios(null)
     setError('')
+    const cuerpo = {
+      nombre: form.nombre,
+      apellido: form.apellido,
+      nombreCompleto: '',
+    }
     try {
       if (editando) {
-        await api(`/api/autores/${editando}`, { method: 'PUT', body: JSON.stringify(form) })
+        await api(`/api/autores/${editando}`, { method: 'PUT', body: JSON.stringify(cuerpo) })
       } else {
-        await api('/api/autores', { method: 'POST', body: JSON.stringify(form) })
+        await api('/api/autores', { method: 'POST', body: JSON.stringify(cuerpo) })
       }
       setForm(VACIO)
       setEditando(null)
@@ -89,7 +92,7 @@ export default function Autores() {
   }
 
   return (
-    <Pagina titulo="Autores" texto="Nombre y apellido se conservan por separado. El nombre completo se arma si lo dejas vacío.">
+    <Pagina titulo="Autores" texto="El nombre completo se forma con el nombre y el apellido.">
       <Aviso>{error}</Aviso>
       <Busqueda valor={consulta} onChange={setConsulta} placeholder="Nombre o apellido" />
       <div className="rejilla">
@@ -100,9 +103,6 @@ export default function Autores() {
           </Campo>
           <Campo etiqueta="Apellido">
             <input name="apellido" value={form.apellido} onChange={cambiar} />
-          </Campo>
-          <Campo etiqueta="Nombre completo">
-            <input name="nombreCompleto" value={form.nombreCompleto} onChange={cambiar} />
           </Campo>
           <div className="acciones">
             <button className="boton" type="submit">{editando ? 'Actualizar' : 'Guardar'}</button>

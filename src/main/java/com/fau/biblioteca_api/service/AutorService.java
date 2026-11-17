@@ -48,9 +48,6 @@ public class AutorService {
     }
 
     private void normalizar(Autor autor) {
-        if (esBlanco(autor.getNombre()) && !esBlanco(autor.getNombreCompleto())) {
-            autor.setNombre(autor.getNombreCompleto().trim());
-        }
         if (esBlanco(autor.getNombre())) {
             throw new RuntimeException("El nombre del autor es obligatorio");
         }
@@ -58,12 +55,8 @@ public class AutorService {
         if (autor.getApellido() != null) {
             autor.setApellido(autor.getApellido().trim());
         }
-        if (esBlanco(autor.getNombreCompleto())) {
-            String apellido = esBlanco(autor.getApellido()) ? "" : " " + autor.getApellido();
-            autor.setNombreCompleto((autor.getNombre() + apellido).trim());
-        } else {
-            autor.setNombreCompleto(autor.getNombreCompleto().trim());
-        }
+        String apellido = esBlanco(autor.getApellido()) ? "" : " " + autor.getApellido();
+        autor.setNombreCompleto((autor.getNombre() + apellido).trim());
     }
 
     private boolean esBlanco(String valor) {
