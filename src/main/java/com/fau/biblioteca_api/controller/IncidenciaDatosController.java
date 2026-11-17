@@ -21,9 +21,12 @@ public class IncidenciaDatosController {
     @GetMapping
     public List<IncidenciaDatos> listar(
             @RequestParam(required = false) Boolean resuelto,
-            @RequestParam(required = false) Integer idLibro) {
+            @RequestParam(required = false) Integer idLibro,
+            @RequestParam(required = false) String texto,
+            @RequestParam(required = false) Integer limite,
+            @RequestParam(required = false) Integer pagina) {
 
-        return incidenciaService.listar(resuelto, idLibro);
+        return incidenciaService.listar(resuelto, idLibro, texto, limite, pagina);
     }
 
     @GetMapping("/{id}")

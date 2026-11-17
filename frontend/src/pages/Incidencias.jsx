@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, AvisarVacios, Busqueda, Campo, Pagina, Paginacion, Selector, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
+import { Aviso, AvisarVacios, Busqueda, Campo, FILAS_POR_PAGINA, Pagina, Selector, Vacio, vacios } from '../ui'
 
 const VACIO = { idLibro: '', campo: '', valorOriginal: '', descripcion: '' }
 
@@ -12,8 +12,9 @@ export default function Incidencias() {
   const editarPermiso = puede(usuario, 'puedeActualizar')
   const [incidencias, setIncidencias] = useState([])
   const [libros, setLibros] = useState([])
-  const [filtro, setFiltro] = useState('')
+  const [filtro, setFiltro] = useState('false')
   const [form, setForm] = useState(VACIO)
+  const [busqueda, setBusqueda] = useState('')
   const [consulta, setConsulta] = useState('')
   const [pagina, setPagina] = useState(0)
   const [abierta, setAbierta] = useState(null)
@@ -22,29 +23,56 @@ export default function Incidencias() {
   const [guardando, setGuardando] = useState(false)
   const [avisarVacios, setAvisarVacios] = useState(null)
   const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const pedido = useRef(0)
 
   useEffect(() => {
     api('/api/libros/buscar').then(setLibros).catch((err) => setError(err.message))
-    cargar('')
   }, [])
 
-  useEffect(() => { setPagina(0) }, [consulta, filtro])
+  useEffect(() => {
+    const espera = setTimeout(() => {
+      setPagina(0)
+      setConsulta(busqueda.trim())
+    }, 300)
+    return () => clearTimeout(espera)
+  }, [busqueda])
 
-  const filtrados = useMemo(
-    () => incidencias.filter((incidencia) => algunoEmpieza(consulta, [incidencia.libro?.titulo, incidencia.campo, incidencia.descripcion, incidencia.valorOriginal])),
-    [incidencias, consulta],
-  )
-  const visibles = paginaDe(filtrados, pagina)
-
-  async function cargar(estado) {
+  useEffect(() => {
+    const id = ++pedido.current
+    setCargando(true)
     setError('')
-    const params = new URLSearchParams()
-    if (estado !== '') params.set('resuelto', estado)
-    try {
-      setIncidencias(await api(`/api/incidencias${params.size ? `?${params}` : ''}`))
-    } catch (err) {
-      setError(err.message)
-    }
+    const params = new URLSearchParams({
+      limite: String(FILAS_POR_PAGINA),
+      pagina: String(pagina),
+    })
+    if (filtro !== '') params.set('resuelto', filtro)
+    if (consulta) params.set('texto', consulta)
+    api(`/api/incidencias?${params}`)
+      .then((lista) => {
+        if (id !== pedido.current) return
+        setIncidencias(lista)
+      })
+      .catch((err) => {
+        if (id !== pedido.current) return
+        setError(err.message)
+        setIncidencias([])
+      })
+      .finally(() => {
+        if (id === pedido.current) setCargando(false)
+      })
+  }, [consulta, pagina, filtro])
+
+  const hayMas = incidencias.length >= FILAS_POR_PAGINA
+
+  async function recargar(hoja = pagina) {
+    const params = new URLSearchParams({
+      limite: String(FILAS_POR_PAGINA),
+      pagina: String(hoja),
+    })
+    if (filtro !== '') params.set('resuelto', filtro)
+    if (consulta) params.set('texto', consulta)
+    setIncidencias(await api(`/api/incidencias?${params}`))
   }
 
   async function crearIncidencia(evento, forzar = false) {
@@ -67,7 +95,8 @@ export default function Incidencias() {
         }),
       })
       setForm(VACIO)
-      await cargar(filtro)
+      setPagina(0)
+      await recargar(0)
     } catch (err) {
       setError(err.message)
     }
@@ -102,7 +131,8 @@ export default function Incidencias() {
         body: JSON.stringify({ valor: valor.trim() }),
       })
       setAbierta(null)
-      await cargar(filtro)
+      setPagina(0)
+      await recargar(0)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -116,9 +146,9 @@ export default function Incidencias() {
     <Pagina titulo="Incidencias" texto="Inconsistencias del inventario. Resolver una incidencia conserva el historial.">
       <Aviso>{error}</Aviso>
       <div className="acciones">
-        <button className={filtro === '' ? 'boton' : 'boton boton-secundario'} type="button" onClick={() => { setFiltro(''); cargar('') }}>Todas</button>
-        <button className={filtro === 'false' ? 'boton' : 'boton boton-secundario'} type="button" onClick={() => { setFiltro('false'); cargar('false') }}>Pendientes</button>
-        <button className={filtro === 'true' ? 'boton' : 'boton boton-secundario'} type="button" onClick={() => { setFiltro('true'); cargar('true') }}>Resueltas</button>
+        <button className={filtro === '' ? 'boton' : 'boton boton-secundario'} type="button" onClick={() => { setFiltro(''); setPagina(0) }}>Todas</button>
+        <button className={filtro === 'false' ? 'boton' : 'boton boton-secundario'} type="button" onClick={() => { setFiltro('false'); setPagina(0) }}>Pendientes</button>
+        <button className={filtro === 'true' ? 'boton' : 'boton boton-secundario'} type="button" onClick={() => { setFiltro('true'); setPagina(0) }}>Resueltas</button>
       </div>
       {crear && <form className="panel" onSubmit={crearIncidencia}>
         <h2>Nueva incidencia</h2>
@@ -140,13 +170,15 @@ export default function Incidencias() {
         </Campo>
         <button className="boton" type="submit">Registrar</button>
       </form>}
-      <Busqueda valor={consulta} onChange={setConsulta} placeholder="Obra, campo o descripción" />
-      {filtrados.length === 0 ? <Vacio>No hay incidencias que empiecen por ese texto.</Vacio> : (
+      <Busqueda valor={busqueda} onChange={setBusqueda} placeholder="Obra, campo o descripción" />
+      {cargando ? <p className="nota">Cargando incidencias…</p> : incidencias.length === 0 ? (
+        <Vacio>{consulta ? 'No hay incidencias que empiecen por ese texto.' : filtro === 'false' ? 'No hay incidencias pendientes.' : filtro === 'true' ? 'No hay incidencias resueltas.' : 'No hay incidencias registradas.'}</Vacio>
+      ) : (
         <div className="tabla-contenedor">
           <table>
             <thead><tr><th>Obra</th><th>Campo</th><th>Valor original</th><th>Descripción</th><th>Estado</th><th></th></tr></thead>
             <tbody>
-              {visibles.map((incidencia) => (
+              {incidencias.map((incidencia) => (
                 <tr key={incidencia.idIncidencia}>
                   <td>{incidencia.libro?.titulo || '—'}</td>
                   <td>{incidencia.campo}</td>
@@ -158,7 +190,21 @@ export default function Incidencias() {
               ))}
             </tbody>
           </table>
-          <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+          {(pagina > 0 || hayMas) && (
+            <div className="acciones" style={{ marginTop: '1rem', justifyContent: 'space-between' }}>
+              <p className="nota">
+                Página {pagina + 1}: {incidencias.length} incidencia{incidencias.length === 1 ? '' : 's'}
+              </p>
+              <div className="acciones">
+                <button className="boton boton-secundario" type="button" disabled={pagina <= 0 || cargando} onClick={() => setPagina((actual) => actual - 1)}>
+                  Anterior
+                </button>
+                <button className="boton boton-secundario" type="button" disabled={!hayMas || cargando} onClick={() => setPagina((actual) => actual + 1)}>
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {avisarVacios && (

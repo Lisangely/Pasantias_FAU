@@ -20,6 +20,7 @@ import com.fau.biblioteca_api.repository.LibroAutorRepository;
 import com.fau.biblioteca_api.repository.LibroRepository;
 import com.fau.biblioteca_api.repository.PrestamoRepository;
 import com.fau.biblioteca_api.repository.UbicacionRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,7 +76,24 @@ public class IncidenciaDatosService {
     }
 
     public List<IncidenciaDatos> listar(Boolean resuelto, Integer idLibro) {
-        return incidenciaRepository.buscar(resuelto, idLibro);
+        return listar(resuelto, idLibro, null, null, null);
+    }
+
+    public List<IncidenciaDatos> listar(
+            Boolean resuelto,
+            Integer idLibro,
+            String texto,
+            Integer limite,
+            Integer pagina) {
+
+        int tope = limite == null ? 50 : Math.max(1, Math.min(limite, 200));
+        int hoja = pagina == null ? 0 : Math.max(0, pagina);
+        String filtro = texto == null ? "" : texto.trim();
+        return incidenciaRepository.buscar(
+                resuelto,
+                idLibro,
+                filtro,
+                PageRequest.of(hoja, tope));
     }
 
     public IncidenciaDatos obtener(Integer id) {
