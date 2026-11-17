@@ -43,7 +43,7 @@ export default function Prestamos() {
     try {
       const [listaPrestamos, listaEjemplares, listaLectores] = await Promise.all([
         api('/api/prestamos'),
-        api('/api/ejemplares'),
+        api('/api/ejemplares?limite=200'),
         api('/api/lectores'),
       ])
       setPrestamos(listaPrestamos)

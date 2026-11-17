@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { puede } from '../permisos'
-import { Aviso, AvisarVacios, Busqueda, Campo, Pagina, Paginacion, Selector, Vacio, algunoEmpieza, paginaDe, vacios } from '../ui'
+import { Aviso, AvisarVacios, Busqueda, Campo, FILAS_POR_PAGINA, Pagina, Selector, Vacio, vacios } from '../ui'
 
 const VACIO = { idLibro: '', idUbicacion: '', numeroEjemplar: '', disponible: true, requiereRevision: false }
 
@@ -15,10 +15,13 @@ export default function Ejemplares() {
   const [ubicaciones, setUbicaciones] = useState([])
   const [form, setForm] = useState(VACIO)
   const [editando, setEditando] = useState(null)
+  const [filtro, setFiltro] = useState('')
   const [consulta, setConsulta] = useState('')
   const [pagina, setPagina] = useState(0)
   const [avisarVacios, setAvisarVacios] = useState(null)
   const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const pedido = useRef(0)
 
   useEffect(() => {
     Promise.all([api('/api/libros/buscar'), api('/api/ubicaciones')])
@@ -27,25 +30,41 @@ export default function Ejemplares() {
         setUbicaciones(listaUbicaciones)
       })
       .catch((err) => setError(err.message))
-    cargar()
   }, [])
 
-  useEffect(() => { setPagina(0) }, [consulta])
+  useEffect(() => {
+    const espera = setTimeout(() => {
+      setPagina(0)
+      setConsulta(filtro.trim())
+    }, 300)
+    return () => clearTimeout(espera)
+  }, [filtro])
 
-  const filtrados = useMemo(
-    () => ejemplares.filter((ejemplar) => algunoEmpieza(consulta, [ejemplar.libro?.titulo, ejemplar.ubicacion?.ubicacionOriginal])),
-    [ejemplares, consulta],
-  )
-  const visibles = paginaDe(filtrados, pagina)
-
-  async function cargar() {
+  useEffect(() => {
+    const id = ++pedido.current
+    setCargando(true)
     setError('')
-    try {
-      setEjemplares(await api('/api/ejemplares'))
-    } catch (err) {
-      setError(err.message)
-    }
-  }
+    const params = new URLSearchParams({
+      limite: String(FILAS_POR_PAGINA),
+      pagina: String(pagina),
+    })
+    if (consulta) params.set('titulo', consulta)
+    api(`/api/ejemplares?${params}`)
+      .then((lista) => {
+        if (id !== pedido.current) return
+        setEjemplares(lista)
+      })
+      .catch((err) => {
+        if (id !== pedido.current) return
+        setError(err.message)
+        setEjemplares([])
+      })
+      .finally(() => {
+        if (id === pedido.current) setCargando(false)
+      })
+  }, [consulta, pagina])
+
+  const hayMas = ejemplares.length >= FILAS_POR_PAGINA
 
   function cambiar(evento) {
     const { name, value, type, checked } = evento.target
@@ -76,7 +95,13 @@ export default function Ejemplares() {
       else await api('/api/ejemplares', { method: 'POST', body: JSON.stringify(cuerpo) })
       setForm(VACIO)
       setEditando(null)
-      await cargar()
+      setPagina(0)
+      const params = new URLSearchParams({
+        limite: String(FILAS_POR_PAGINA),
+        pagina: '0',
+      })
+      if (consulta) params.set('titulo', consulta)
+      setEjemplares(await api(`/api/ejemplares?${params}`))
     } catch (err) {
       setError(err.message)
     }
@@ -85,7 +110,7 @@ export default function Ejemplares() {
   return (
     <Pagina titulo="Ejemplares" texto="Cada copia física se presta por separado y tiene su propia ubicación.">
       <Aviso>{error}</Aviso>
-      <Busqueda valor={consulta} onChange={setConsulta} placeholder="Título de la obra" />
+      <Busqueda valor={filtro} onChange={setFiltro} placeholder="Título de la obra" />
       <div className="rejilla">
         {(crear || (editarPermiso && editando)) && <form className="panel" onSubmit={guardar}>
           <h2>{editando ? 'Editar ejemplar' : 'Nuevo ejemplar'}</h2>
@@ -123,14 +148,16 @@ export default function Ejemplares() {
           </div>
         </form>}
         <div className="tabla-contenedor">
-          {filtrados.length === 0 ? <Vacio>No hay ejemplares que empiecen por ese texto.</Vacio> : (
+          {cargando ? <p className="nota">Cargando ejemplares…</p> : ejemplares.length === 0 ? (
+            <Vacio>{consulta ? 'No hay ejemplares que empiecen por ese título.' : 'No hay ejemplares registrados.'}</Vacio>
+          ) : (
             <>
               <table>
                 <thead>
                   <tr><th>Obra</th><th>Nº</th><th>Ubicación</th><th>Estado</th><th></th></tr>
                 </thead>
                 <tbody>
-                  {visibles.map((ejemplar) => (
+                  {ejemplares.map((ejemplar) => (
                     <tr key={ejemplar.idEjemplar}>
                       <td>{ejemplar.libro?.titulo || '—'}</td>
                       <td>{ejemplar.numeroEjemplar ?? '—'}</td>
@@ -154,7 +181,21 @@ export default function Ejemplares() {
                   ))}
                 </tbody>
               </table>
-              <Paginacion pagina={pagina} total={filtrados.length} onChange={setPagina} />
+              {(pagina > 0 || hayMas) && (
+                <div className="acciones" style={{ marginTop: '1rem', justifyContent: 'space-between' }}>
+                  <p className="nota">
+                    Página {pagina + 1}: {ejemplares.length} ejemplar{ejemplares.length === 1 ? '' : 'es'}
+                  </p>
+                  <div className="acciones">
+                    <button className="boton boton-secundario" type="button" disabled={pagina <= 0 || cargando} onClick={() => setPagina((actual) => actual - 1)}>
+                      Anterior
+                    </button>
+                    <button className="boton boton-secundario" type="button" disabled={!hayMas || cargando} onClick={() => setPagina((actual) => actual + 1)}>
+                      Siguiente
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

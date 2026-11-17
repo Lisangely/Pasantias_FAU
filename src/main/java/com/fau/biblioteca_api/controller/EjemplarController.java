@@ -19,9 +19,12 @@ public class EjemplarController {
 
     @GetMapping
     public List<Ejemplar> listar(
-            @RequestParam(required = false) Integer idLibro) {
+            @RequestParam(required = false) Integer idLibro,
+            @RequestParam(required = false) String titulo,
+            @RequestParam(required = false) Integer limite,
+            @RequestParam(required = false) Integer pagina) {
 
-        return ejemplarService.listar(idLibro);
+        return ejemplarService.listar(idLibro, titulo, limite, pagina);
     }
 
     @GetMapping("/{id}")

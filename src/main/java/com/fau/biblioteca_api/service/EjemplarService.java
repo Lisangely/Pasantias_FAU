@@ -10,6 +10,7 @@ import com.fau.biblioteca_api.repository.EjemplarRepository;
 import com.fau.biblioteca_api.repository.LibroRepository;
 import com.fau.biblioteca_api.repository.PrestamoRepository;
 import com.fau.biblioteca_api.repository.UbicacionRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -42,10 +43,22 @@ public class EjemplarService {
     }
 
     public List<Ejemplar> listar(Integer idLibro) {
-        if (idLibro == null) {
-            return ejemplarRepository.findAll();
+        return listar(idLibro, null, null, null);
+    }
+
+    public List<Ejemplar> listar(
+            Integer idLibro,
+            String titulo,
+            Integer limite,
+            Integer pagina) {
+
+        if (idLibro != null) {
+            return ejemplarRepository.findByLibro_IdLibro(idLibro);
         }
-        return ejemplarRepository.findByLibro_IdLibro(idLibro);
+        int tope = limite == null ? 50 : Math.max(1, Math.min(limite, 200));
+        int hoja = pagina == null ? 0 : Math.max(0, pagina);
+        String filtro = titulo == null ? "" : titulo.trim();
+        return ejemplarRepository.buscarPorTitulo(filtro, PageRequest.of(hoja, tope));
     }
 
     public Ejemplar obtener(Integer id) {
