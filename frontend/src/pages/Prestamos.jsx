@@ -26,6 +26,18 @@ export default function Prestamos() {
   useEffect(() => { cargar() }, [])
   useEffect(() => { setPagina(0) }, [consulta])
 
+  const ordenados = useMemo(() => [...prestamos]
+    .sort((a, b) => String(b.fechaPrestamo).localeCompare(String(a.fechaPrestamo)))
+    .filter((prestamo) => algunoEmpieza(consulta, [
+      prestamo.ejemplar?.libro?.titulo,
+      prestamo.lector ? `${prestamo.lector.nombre} ${prestamo.lector.apellido}` : '',
+      prestamo.lector?.nombre,
+      prestamo.lector?.apellido,
+      prestamo.estado,
+    ])), [prestamos, consulta])
+  const visibles = paginaDe(ordenados, pagina)
+  const disponibles = ejemplares.filter((ejemplar) => ejemplar.disponible)
+
   async function cargar() {
     setError('')
     try {
@@ -102,18 +114,6 @@ export default function Prestamos() {
       setError(err.message)
     }
   }
-
-  const disponibles = ejemplares.filter((ejemplar) => ejemplar.disponible)
-  const ordenados = useMemo(() => [...prestamos]
-    .sort((a, b) => String(b.fechaPrestamo).localeCompare(String(a.fechaPrestamo)))
-    .filter((prestamo) => algunoEmpieza(consulta, [
-      prestamo.ejemplar?.libro?.titulo,
-      prestamo.lector ? `${prestamo.lector.nombre} ${prestamo.lector.apellido}` : '',
-      prestamo.lector?.nombre,
-      prestamo.lector?.apellido,
-      prestamo.estado,
-    ])), [prestamos, consulta])
-  const visibles = paginaDe(ordenados, pagina)
 
   return (
     <Pagina titulo="Préstamos" texto="El préstamo queda a nombre de quien inició sesión. Un ejemplar no puede tener dos préstamos activos.">

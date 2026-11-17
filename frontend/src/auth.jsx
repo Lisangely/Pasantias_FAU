@@ -24,7 +24,9 @@ export function AuthProvider({ children }) {
       for (let intento = 1; intento <= 10; intento += 1) {
         try {
           const sesion = await api('/api/auth/me')
-          if (!cancelado) setUsuario(sesion)
+          if (!cancelado) {
+            setUsuario(sesion && typeof sesion === 'object' ? sesion : null)
+          }
           return
         } catch (error) {
           if (error.status === 401) {

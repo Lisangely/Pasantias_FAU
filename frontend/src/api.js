@@ -6,11 +6,15 @@ export function definirAlPerderSesion(funcion) {
   alPerderSesion = funcion
 }
 
+function esHtml(data) {
+  return typeof data === 'string' && (data.includes('<html') || data.includes('<!DOCTYPE'))
+}
+
 function mensajeDe(data, status) {
   if (!data) return `Error ${status}`
   if (typeof data === 'string') {
-    if (data.includes('<html') || data.includes('<!DOCTYPE')) {
-      return 'La API no respondió. Comprueba que la biblioteca esté iniciada en el puerto 8081.'
+    if (esHtml(data)) {
+      return 'La API no respondió. El servidor puede estar despertando; espera un minuto y recarga.'
     }
     return data
   }
@@ -47,6 +51,12 @@ export async function api(path, options = {}) {
     } catch {
       data = text
     }
+  }
+
+  if (esHtml(data)) {
+    const error = new Error('La API no respondió. El servidor puede estar despertando; espera un minuto y recarga.')
+    error.status = 503
+    throw error
   }
 
   if (response.status === 401 && path !== '/api/auth/login') {
